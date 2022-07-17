@@ -5,8 +5,8 @@ TARGET = allocation
 OBJFILES = allocation.o
 all: $(TARGET)
 
-allocation: allocation.c
-	$(CC) $(CFLAGS) -o allocation allocation.c
+allocation: 200188260_190555710_allocation.c
+	$(CC) $(CFLAGS) -o allocation 200188260_190555710_allocation.c
 	
 run: allocation
 	./allocation 1048576
