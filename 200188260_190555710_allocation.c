@@ -6,27 +6,27 @@
 #include <ctype.h>
 #include <string.h>
 
-typedef struct {
+typedef struct free_node {
     int size;
     int start;
     int end;
-    free_node *next;
-} free_node;
+    struct free_node *next;
+} FREE;
 
-typedef struct {
+typedef struct allocated_node {
     int size;
     char *proc_name;
     int start;
     int end;
-    allocated_node *next;
-} allocated_node;
+    struct allocated_node *next;
+} ALLOCATED;
 
-void allocate(free_node *free_mem, allocated_node *alloc_mem, char alg, char *proc_name, int size);
-void free(free_node *free_mem, allocated_node *alloc_mem, char *proc_name);
+void allocate_memory(FREE **free_mem, ALLOCATED **alloc_mem, char alg, char *proc_name, int size);
+void free_memory(FREE **free_mem, ALLOCATED **alloc_mem, char *proc_name);
 
-void insert(free_node *free_mem, free_node *node){
+void free_insert(FREE *free_mem, FREE *node){
     if(free_mem){
-        free_node *ptr = free_mem;
+        FREE *ptr = free_mem;
         while(ptr->next){
             if(ptr->start < node->start){
                 node->next = ptr->next;
@@ -43,9 +43,9 @@ void insert(free_node *free_mem, free_node *node){
     }
 }
 
-void insert(allocated_node *alloc_mem, allocated_node *node){
+void alloc_insert(ALLOCATED *alloc_mem, ALLOCATED *node){
     if(alloc_mem){
-        free_node *ptr = alloc_mem;
+        ALLOCATED *ptr = alloc_mem;
         while(ptr->next){
             if(ptr->start < node->start){
                 node->next = ptr->next;
@@ -63,6 +63,9 @@ void insert(allocated_node *alloc_mem, allocated_node *node){
 }
 
 int main(int argc, char *argv[]) {
+    FREE *free_mem = NULL;
+    ALLOCATED *alloc_mem = NULL;
+
     int* ptr;
     char command[20];
     
@@ -86,7 +89,7 @@ int main(int argc, char *argv[]) {
             if (strcmp(token,"RQ")==0) {
                 //printf("in RQ\n");
                 //RQ <process number> <size> <B>, new process
-                char processNum[2];
+                char *processNum = (char*)malloc(4*sizeof(char));
                 int processSize;
 
                 token = strtok(NULL, " ");
@@ -100,21 +103,7 @@ int main(int argc, char *argv[]) {
                 //printf( "processSize:%d\n", processSize);
                 //printf( "type:%c\n", type);
                 
-                if (type == 70) {
-                    //printf("in F\n");
-                    // first fit
-
-                }
-                else if (type == 66) {
-                    //printf("in B\n");
-                    // best fit
-
-                }
-                else if (type == 87) {
-                    //printf("in W\n");
-                    // worst fit
-
-                }
+                allocate_memory(&free_mem, &alloc_mem, type, processNum, processSize);
 
                 //printf("Successfully allocated %d to process %s\n", processSize, processNum);
 
@@ -122,7 +111,7 @@ int main(int argc, char *argv[]) {
             else if (strcmp(token,"RL")==0) {
                 //printf("in RL\n");
                 //RL <process number/name>, release memory
-                char processNum[4];
+                char *processNum = (char*)malloc(4*sizeof(char));
 
                 token = strtok(NULL, " ");
                 strcpy(processNum,token); //<process number/name>
@@ -150,9 +139,9 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void clean(free_node **free_mem){
-    free_node *curr = *free_mem;
-    free_node *prev = NULL;
+void clean(FREE **free_mem){
+    FREE *curr = *free_mem;
+    FREE *prev = NULL;
 
     while(curr){
         if(curr->size == 0){
@@ -178,8 +167,8 @@ void clean(free_node **free_mem){
     }
 }
 
-int first_fit(free_node **free_mem, int size){
-    free_node *ptr = *free_mem;
+int first_fit(FREE **free_mem, int size){
+    FREE *ptr = *free_mem;
     int start;
     if(ptr){
         while(ptr){
@@ -195,15 +184,15 @@ int first_fit(free_node **free_mem, int size){
     return -1;
 }
 
-int best_fit(free_node **free_mem, int size){
+int best_fit(FREE **free_mem, int size){
 
 }
 
-int worst_fit(free_node **free_mem, int size){
+int worst_fit(FREE **free_mem, int size){
 
 }
 
-void allocate(free_node **free_mem, allocated_node **alloc_mem, char alg, char *proc_name, int size){
+void allocate_memory(FREE **free_mem, ALLOCATED **alloc_mem, char alg, char *proc_name, int size){
     int block;
     if(alg == 'F'){
         block = first_fit(free_mem, size);
@@ -220,7 +209,7 @@ void allocate(free_node **free_mem, allocated_node **alloc_mem, char alg, char *
         printf("No valid memory block for the process\n");
         return;
     } else {
-        allocated_node *new_node = (allocated_node*)malloc(sizeof(allocated_node));
+        ALLOCATED *new_node = (ALLOCATED*)malloc(sizeof(ALLOCATED));
         new_node->start = block;
         new_node->end = block+size-1;
         new_node->size = size;
@@ -228,14 +217,14 @@ void allocate(free_node **free_mem, allocated_node **alloc_mem, char alg, char *
 
         new_node->next = NULL;
 
-        insert(alloc_mem, new_node);
+        alloc_insert(*alloc_mem, new_node);
         clean(free_mem);
     }
 }
 
-void free(free_node *free_mem, allocated_node *alloc_mem, char *proc_name){
-    allocated_node *curr = alloc_mem;
-    allocated_node *prev = NULL;
+void free_memory(FREE **free_mem, ALLOCATED **alloc_mem, char *proc_name){
+    ALLOCATED *curr = *alloc_mem;
+    ALLOCATED *prev = NULL;
 
     while(curr){
         if(strcmp(curr->proc_name, proc_name)){
@@ -256,11 +245,11 @@ void free(free_node *free_mem, allocated_node *alloc_mem, char *proc_name){
         prev->next = curr->next;
         free(curr);
 
-        free_node *new_node = (free_node*)malloc(sizeof(free_node));
+        FREE *new_node = (FREE*)malloc(sizeof(FREE));
         new_node->size = free_size;
         new_node->start = start;
         new_node->end = start + free_size-1;
-        insert(free_mem, new_node);
+        free_insert(*free_mem, new_node);
         clean(free_mem);
     }
 }
