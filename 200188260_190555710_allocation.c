@@ -63,14 +63,19 @@ void alloc_insert(ALLOCATED *alloc_mem, ALLOCATED *node){
 }
 
 int main(int argc, char *argv[]) {
-    FREE *free_mem = NULL;
+    //FREE *free_mem = NULL;
     ALLOCATED *alloc_mem = NULL;
+    
+    FREE *free_mem;
+    free_mem->start = 0;
+    free_mem->end = size;
+    free_mem->size = size;
 
-    int* ptr;
+    //int* ptr;
     char command[20];
     
     int size = atoi(argv[1]);
-    ptr = (int*)malloc(size*sizeof(int));
+    //ptr = (int*)malloc(size*sizeof(int));
     printf("Allocated %d bytes of memory\n",size);
         printf("allocator>");
 
@@ -135,7 +140,7 @@ int main(int argc, char *argv[]) {
         printf("allocator>");
     }
     
-    free(ptr);
+    //free(ptr);
     return 0;
 }
 
@@ -185,11 +190,48 @@ int first_fit(FREE **free_mem, int size){
 }
 
 int best_fit(FREE **free_mem, int size){
-
+    int start;
+    FREE *ptr = *free_mem;
+    FREE *temp = NULL;
+    int min = ptr->size;
+    if(ptr){
+        while(ptr){
+            if(ptr->size >= size && ptr->size < min){
+                min = ptr->size;
+                start = ptr->start;
+                temp = ptr;
+                ptr = ptr->next;
+            }
+            ptr = ptr->next;
+        }
+        temp->start += min;
+        temp->size -= min;
+        return start;
+    }
+    return -1;
 }
 
 int worst_fit(FREE **free_mem, int size){
-
+    int start;
+    FREE *ptr = *free_mem;
+    FREE *temp = NULL;
+    int max = ptr->size;
+    if(ptr){
+        while(ptr){
+            if(ptr->size >= size && ptr->size > max){
+                max = ptr->size;
+                start = ptr->start;
+                temp = ptr;
+                ptr = ptr->next;
+            }
+            ptr = ptr->next;
+        }
+        temp->start += max;
+        temp->size -= max;
+        return start;
+    }
+    return -1;
+    
 }
 
 void allocate_memory(FREE **free_mem, ALLOCATED **alloc_mem, char alg, char *proc_name, int size){
