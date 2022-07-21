@@ -16,6 +16,7 @@ typedef struct free_node {
 typedef struct allocated_node {
     int size;
     char *proc_name;
+    unsigned char *memory;
     int start;
     int end;
     struct allocated_node *next;
@@ -24,68 +25,105 @@ typedef struct allocated_node {
 void allocate_memory(FREE **free_mem, ALLOCATED **alloc_mem, char alg, char *proc_name, int size);
 void free_memory(FREE **free_mem, ALLOCATED **alloc_mem, char *proc_name);
 
-void free_insert(FREE *free_mem, FREE *node){
-    if(free_mem){
-        FREE *ptr = free_mem;
-        while(ptr->next){
-            if(ptr->start < node->start){
-                node->next = ptr->next;
+void free_insert(FREE **free_mem, FREE *node){
+    if(*free_mem){
+        FREE *ptr = *free_mem;
+        if(node->start < ptr->start){
+            node->next = ptr;
+            *free_mem = node;
+        } else {
+            while(ptr->next){
+                if(node->start < ptr->next->start){
+                    node->next = ptr->next;
+                    ptr->next = node;
+                    return;
+                } else {
+                    //printf("loop2\n");
+                    ptr = ptr->next;
+                }
+            }
+            if(ptr->next == NULL){
                 ptr->next = node;
-            } else {
-                ptr = ptr->next;
             }
         }
-        if(ptr->next == NULL){
-            ptr->next = node;
-        }
     } else {
-        free_mem = node;
+        *free_mem = node;
     }
 }
 
-void alloc_insert(ALLOCATED *alloc_mem, ALLOCATED *node){
-    if(alloc_mem){
-        ALLOCATED *ptr = alloc_mem;
-        while(ptr->next){
-            if(ptr->start < node->start){
-                node->next = ptr->next;
+void alloc_insert(ALLOCATED **alloc_mem, ALLOCATED *node){
+    if(*alloc_mem){
+        //printf("NOP\n, %d", alloc_mem == NULL);
+        ALLOCATED *ptr = *alloc_mem;
+        if(node->start < ptr->start){
+            node->next = ptr;
+            *alloc_mem = node;
+        } else {
+            while(ptr->next){
+                if(node->start < ptr->next->start){
+                    node->next = ptr->next;
+                    ptr->next = node;
+                    //printf("%d:%d\n", ptr->next->start, node->start);
+                    return;
+                } else {
+                    ptr = ptr->next;
+                }
+            }
+            if(ptr->next == NULL){
                 ptr->next = node;
-            } else {
-                ptr = ptr->next;
             }
         }
-        if(ptr->next == NULL){
-            ptr->next = node;
-        }
     } else {
-        alloc_mem = node;
+        *alloc_mem = node;
     }
 }
+
+unsigned char* memory;
+int total_memory;
+int used_memory = 0;;
 
 int main(int argc, char *argv[]) {
-    //FREE *free_mem = NULL;
+    FREE *free_mem = NULL;
     ALLOCATED *alloc_mem = NULL;
     
-    FREE *free_mem;
-    free_mem->start = 0;
-    free_mem->end = size;
-    free_mem->size = size;
-
-    //int* ptr;
+    //FREE *free_mem;
     char command[20];
     
-    int size = atoi(argv[1]);
-    //ptr = (int*)malloc(size*sizeof(int));
-    printf("Allocated %d bytes of memory\n",size);
+    //total_memory = atoi(argv[1]);
+    total_memory = 1048576;
+    memory = (char*)malloc(total_memory*sizeof(char));
+
+    free_mem = (FREE*)malloc(sizeof(FREE));
+    free_mem->size = total_memory;
+    free_mem->start = 0;
+    free_mem->end = total_memory-1;
+    free_mem->next = NULL;
+
+    printf("Allocated %d bytes of memory\n", total_memory);
         printf("allocator>");
 
     while(scanf("%[^\n]%*c", command)) {
         //printf("%s",command);
-        if (strcmp(command,"Exit")==0) exit(0);
+        if (strcmp(command,"Exit")==0){
+            free(memory);
+            exit(0);
+        } 
 
         if (strcmp(command,"Status")==0) {
             //reporting the status of memory
+            printf("Paritions [Allocated memory = %d]:\n", used_memory);
+            ALLOCATED *ptr = alloc_mem;
+            while(ptr){
+                printf("Address [%d:%d] Process %s\n", ptr->start, ptr->end, ptr->proc_name);
+                ptr = ptr->next;
+            }
 
+            printf("\nHoles [Free memory = %d]:\n", total_memory-used_memory);
+            FREE *fptr = free_mem;
+            while(fptr){
+                printf("Address [%d:%d] len = %d\n", fptr->start, fptr->end, fptr->size);
+                fptr = fptr->next;
+            }
         }
         else {
             char *token = strtok(command," ");
@@ -110,7 +148,7 @@ int main(int argc, char *argv[]) {
                 
                 allocate_memory(&free_mem, &alloc_mem, type, processNum, processSize);
 
-                //printf("Successfully allocated %d to process %s\n", processSize, processNum);
+                
 
             }
             else if (strcmp(token,"RL")==0) {
@@ -124,8 +162,9 @@ int main(int argc, char *argv[]) {
                 //printf( "processNum:%s\n", processNum);
 
                 //RL function here
+                free_memory(&free_mem, &alloc_mem, processNum);
 
-                printf("releasing memory for process %s\n",processNum);
+                
 
             }
             else if (strcmp(token,"C")==0) {
@@ -133,6 +172,36 @@ int main(int argc, char *argv[]) {
                 // compact set of holes into one larger hole
 
                 //C function here
+                ALLOCATED *curr = alloc_mem;
+                ALLOCATED *prev = NULL;
+                while(curr){
+                    if(prev && prev->end != curr->start-1){
+                        curr->start = prev->end+1;
+                        curr->end = curr->start+curr->size-1;
+                        curr->memory = memory+curr->start;
+                    } else if(prev == NULL && curr->start != 0){
+                        curr->start = 0;
+                        curr->end = curr->size-1;
+                        curr->memory = memory;
+                    }
+                    prev = curr;
+                    curr = curr->next;
+                }
+
+                FREE *curr_free = free_mem;
+                FREE *prev_free = NULL;
+
+                free_mem = (FREE*)malloc(sizeof(FREE));
+                free_mem->size = total_memory-used_memory;
+                free_mem->start = used_memory;
+                free_mem->end = used_memory+free_mem->size-1;
+                free_mem->next = NULL;
+
+                while(curr_free){
+                    prev_free = curr_free;
+                    curr_free = curr_free->next;
+                    free(prev_free);
+                }
 
                 printf("Compaction process is successful\n");
             }
@@ -191,21 +260,26 @@ int first_fit(FREE **free_mem, int size){
 
 int best_fit(FREE **free_mem, int size){
     int start;
+    int i =0;
     FREE *ptr = *free_mem;
-    FREE *temp = NULL;
-    int min = ptr->size;
+    FREE *temp = NULL; 
     if(ptr){
+        int min = 1e9;
         while(ptr){
             if(ptr->size >= size && ptr->size < min){
                 min = ptr->size;
                 start = ptr->start;
                 temp = ptr;
-                ptr = ptr->next;
             }
             ptr = ptr->next;
+            i++;
         }
-        temp->start += min;
-        temp->size -= min;
+        if(temp){
+            temp->start += size;
+            temp->size -= size;
+        } else {
+            start = -1;
+        }
         return start;
     }
     return -1;
@@ -215,8 +289,8 @@ int worst_fit(FREE **free_mem, int size){
     int start;
     FREE *ptr = *free_mem;
     FREE *temp = NULL;
-    int max = ptr->size;
     if(ptr){
+        int max = -1e9;
         while(ptr){
             if(ptr->size >= size && ptr->size > max){
                 max = ptr->size;
@@ -226,12 +300,15 @@ int worst_fit(FREE **free_mem, int size){
             }
             ptr = ptr->next;
         }
-        temp->start += max;
-        temp->size -= max;
+        if(temp){
+            temp->start += size;
+            temp->size -= size;
+        } else {
+            start = -1;
+        }
         return start;
     }
-    return -1;
-    
+    return -1;   
 }
 
 void allocate_memory(FREE **free_mem, ALLOCATED **alloc_mem, char alg, char *proc_name, int size){
@@ -247,20 +324,25 @@ void allocate_memory(FREE **free_mem, ALLOCATED **alloc_mem, char alg, char *pro
         return;
     }
 
+    //printf("%d\n", block);
     if(block == -1){
-        printf("No valid memory block for the process\n");
+        printf("No hole of sufficient size\n");
         return;
     } else {
         ALLOCATED *new_node = (ALLOCATED*)malloc(sizeof(ALLOCATED));
         new_node->start = block;
         new_node->end = block+size-1;
         new_node->size = size;
-        strcpy(new_node->proc_name, proc_name);
+        new_node->memory = memory+block;
+        new_node->proc_name = proc_name;
 
         new_node->next = NULL;
 
-        alloc_insert(*alloc_mem, new_node);
+        alloc_insert(alloc_mem, new_node);
         clean(free_mem);
+
+        used_memory+=size;
+        printf("Successfully allocated %d to process %s\n", size, proc_name);
     }
 }
 
@@ -269,7 +351,8 @@ void free_memory(FREE **free_mem, ALLOCATED **alloc_mem, char *proc_name){
     ALLOCATED *prev = NULL;
 
     while(curr){
-        if(strcmp(curr->proc_name, proc_name)){
+        //printf("%s!\n", curr->proc_name);
+        if(strcmp(curr->proc_name, proc_name)==0){
             break;
         } else {
             prev = curr;
@@ -284,14 +367,21 @@ void free_memory(FREE **free_mem, ALLOCATED **alloc_mem, char *proc_name){
         int free_size = curr->size;
         int start = curr->start;
 
-        prev->next = curr->next;
+        if(prev){
+            prev->next = curr->next;
+        } else {
+            *alloc_mem = curr->next;
+        }
         free(curr);
 
         FREE *new_node = (FREE*)malloc(sizeof(FREE));
         new_node->size = free_size;
         new_node->start = start;
         new_node->end = start + free_size-1;
-        free_insert(*free_mem, new_node);
+        free_insert(free_mem, new_node);
         clean(free_mem);
+
+        used_memory -= free_size;
+        printf("releasing memory for process %s\n",proc_name);
     }
 }
