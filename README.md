@@ -7,6 +7,7 @@ the makefile is included with the project so that it can be easily run.
 the only command is `make run` which runs the program with the default 1048576 bytes of memory to be used in allocation.
 
 ##Screenshots/Test cases/Use Example
+the follwing is an image showing usage of the program:
 ![image](https://user-images.githubusercontent.com/8052078/180122292-2f7934c0-d7c7-4399-a2be-494bec30d33f.png)
 
 Here is the screenshot of the basic output of the sample inputs
